@@ -21,7 +21,7 @@ enum PAPER_TYPE_ENUM {
 	FULL_PAPER,
 	POSTER,
 	SHORT_PAPER
-}
+};
 
 class Paper {
    public:
@@ -32,11 +32,8 @@ class Paper {
 	string PaperTitle;
 	string SessionTitle;
 	
-	vector<string> Authors
+	vector<string> Authors;
 	PAPER_TYPE_ENUM paperType;
-
-   private:
-	
 	
 };
 
