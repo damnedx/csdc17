@@ -17,22 +17,27 @@ _______________________________________________________________*/
 
 using namespace std;
 
+enum PAPER_TYPE_ENUM {
+	FULL_PAPER,
+	POSTER,
+	SHORT_PAPER
+}
+
 class Paper {
    public:
-	int id;
-	string title;
-	int nReqRev;
-	vector<string> vAuthors;
-	vector<string> vMails ;
-	vector<string> vTitleKeywords;
-	vector<string> vAbstKeywords;
+	int PaperId;
+	int TrackId;
+	int SessionId;
 	
-	void sayHello(){
-		cout << "ok" << endl;
-	}
-	void hi(){
-		cout << id << endl;
-	}
+	string PaperTitle;
+	string SessionTitle;
+	
+	vector<string> Authors
+	PAPER_TYPE_ENUM paperType;
+
+   private:
+	
+	
 };
 
 \end
