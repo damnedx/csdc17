@@ -14,6 +14,7 @@ _______________________________________________________________*/
 #include <string.h>
 #include <algorithm>
 
+#define UNDEF "UNDEFINED"
 
 using namespace std;
 
@@ -25,21 +26,107 @@ enum PAPER_TYPE_ENUM {
 
 class Paper {
    public:
-	int PaperId;
-	int TrackId;
-	int SessionId;
+	int paperId;
+	int trackId;
+	int sessionId;
+	int primaryAuthorId;
 	
-	string PaperTitle;
-	string SessionTitle;
-	
-	vector<string> Authors;
 	PAPER_TYPE_ENUM paperType;
+	
+	string paperTitle;
+	string sessionTitle;
+	string trackTitle;
+	
+	string utc;
+	string primaryAuthor;
+	string primaryAuthorCountry;
+	string constraintDay1;
+	string constraintDay2;
+	string constraintDay3;
+	
+	string authors;
+	
+	
+	void displayPaper(){
+		cout << "----" << endl;
+		cout << "Paper ID : " << paperId << endl;
+		cout << "Paper Title : " << paperTitle << endl;
+		cout << "E-Track ID : " << trackId << endl;
+		cout << "E-Track Title : " << trackTitle << endl;
+		cout << "E-Session ID : " << sessionId << endl;
+		cout << "E-Session Title : " << sessionTitle << endl;
+		cout << "Primary Author ID : " << primaryAuthorId << endl;
+		cout << "Primary Author : " << primaryAuthor << endl;
+		cout << "Primary Author's Country : " << primaryAuthorCountry << endl;
+		cout << "Authors : " << authors << endl;
+		cout << "Paper's type : " << paperType << endl;
+		cout << "UTC time : " << utc << endl;
+		cout << "Constraint Day 1 : " << constraintDay1 << endl;
+		cout << "Constraint Day 2 : " << constraintDay2 << endl;
+		cout << "Constraint Day 3 : " << constraintDay3 << endl;
+	};
 	
 };
 
+ifstream fPaper;
+
+vector<Paper> papers;
 \end
 
 \User functions:
+// Paper format :
+//Paper ID|Paper Title|E-Track ID|E-Track Title|E-Session ID|E-Session Title|Primary Author ID|Primary Author|Primary Author's Country|Authors|Paper's type|UTC time|Times Constraints - Day 1|Times Constraints - Day 2|Times Constraints - Day 3
+void readPapersFile(){
+	
+	cout << "[INFOS] Papers loading..." << endl;
+	fPaper.open("paper.csv", ios::in);
+	string line;
+	int nb_records = 0;
+	if (fPaper.is_open()) {
+		Paper p;
+		while ( getline (fPaper,line) ) {
+			line.erase(line.length()-2,line.length()-1);
+			char * cstr = new char [line.length()+1];
+			strcpy (cstr, line.c_str());
+			char *szKeywords, *szAbstKeywords;
+			char * s;
+			if(nb_records > 0)
+			{
+				s = strtok (cstr,"|");
+				p.paperId = atoi(s) > 0 ? atoi(s):-1;
+				s = strtok (NULL, "|"); p.paperTitle = s ? s : UNDEF;
+				s = strtok (NULL, "|"); p.trackId = atoi(s);
+				s = strtok (NULL, "|"); p.trackTitle = s ? s :UNDEF;
+				s = strtok (NULL, "|"); p.sessionId = atoi(s) > 0 ? atoi(s):-1;
+				s = strtok (NULL, "|"); p.sessionTitle = s ? s :UNDEF;
+				s = strtok (NULL, "|"); p.primaryAuthorId = atoi(s) > 0 ? atoi(s):-1;
+				s = strtok (NULL, "|"); p.primaryAuthor = s ? s :UNDEF;
+				s = strtok (NULL, "|"); p.primaryAuthorCountry = s ? s :UNDEF;
+				s = strtok (NULL, "|"); p.authors = s ? s :UNDEF;
+				s = strtok (NULL, "|");
+				if(s)
+				{
+					if(strcmp(s,"Poster") == 0)
+						p.paperType = POSTER;
+					else if(strcmp(s,"Full paper") == 0)
+						p.paperType = FULL_PAPER;
+					else if(strcmp(s,"Short paper") == 0)
+						p.paperType = SHORT_PAPER;
+				}
+				s = strtok (NULL, "|"); p.utc = s ? s :UNDEF;
+				s = strtok (NULL, "|"); p.constraintDay1 = s ? s :UNDEF;
+				s = strtok (NULL, "|"); p.constraintDay2 = s ? s :UNDEF;
+				s = strtok (NULL, "|"); p.constraintDay3 = s ? s : UNDEF;	
+				
+				papers.push_back(p);		
+
+			}
+			nb_records++;
+		}
+	}
+	fPaper.close();
+	cout << "[INFOS] (" << papers.size() << ") papers loaded!" << endl;
+} 
 \end
 
 \User CUDA:
@@ -58,6 +145,7 @@ GenomeClass {
 \end
 
 \After everything else function:
+readPapersFile();
 \end
 
 \At the beginning of each generation function:
