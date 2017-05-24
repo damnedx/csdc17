@@ -15,6 +15,7 @@ _______________________________________________________________*/
 #include <algorithm>
 
 #define UNDEF "UNDEFINED"
+#define PATH_TRACKS "tracks.csv"
 
 using namespace std;
 
@@ -30,9 +31,11 @@ class Paper {
 	int trackId;
 	int sessionId;
 	int primaryAuthorId;
+	int decision;
 	
-	PAPER_TYPE_ENUM paperType;
-	
+	string startingTime;
+	string rank;
+	string paperType;
 	string paperTitle;
 	string sessionTitle;
 	string trackTitle;
@@ -60,6 +63,9 @@ class Paper {
 		cout << "Primary Author's Country : " << primaryAuthorCountry << endl;
 		cout << "Authors : " << authors << endl;
 		cout << "Paper's type : " << paperType << endl;
+		cout << "Decision : " << decision << endl;
+		cout << "Starting time : " << startingTime << endl;
+		cout << "Rank : " << rank << endl;
 		cout << "UTC time : " << utc << endl;
 		cout << "Constraint Day 1 : " << constraintDay1 << endl;
 		cout << "Constraint Day 2 : " << constraintDay2 << endl;
@@ -75,11 +81,11 @@ vector<Paper> papers;
 
 \User functions:
 // Paper format :
-//Paper ID|Paper Title|E-Track ID|E-Track Title|E-Session ID|E-Session Title|Primary Author ID|Primary Author|Primary Author's Country|Authors|Paper's type|UTC time|Times Constraints - Day 1|Times Constraints - Day 2|Times Constraints - Day 3
-void readPapersFile(){
+// Paper ID|Paper Title|E-Track ID|E-Track Title|E-Session ID|E-Session Title|Primary Author ID|Primary Author|Primary Author's Country|Authors|Paper's type|Decision|Starting Time|Rank|UTC time|Times Constraints - Day 1|Times Constraints - Day 2|Times Constraints - Day 3
+void readTracksFile(){
 	
 	cout << "[INFOS] Papers loading..." << endl;
-	fPaper.open("paper.csv", ios::in);
+	fPaper.open(PATH_TRACKS, ios::in);
 	string line;
 	int nb_records = 0;
 	if (fPaper.is_open()) {
@@ -103,21 +109,13 @@ void readPapersFile(){
 				s = strtok (NULL, "|"); p.primaryAuthor = s ? s :UNDEF;
 				s = strtok (NULL, "|"); p.primaryAuthorCountry = s ? s :UNDEF;
 				s = strtok (NULL, "|"); p.authors = s ? s :UNDEF;
-				s = strtok (NULL, "|");
-				if(s)
-				{
-					if(strcmp(s,"Poster") == 0)
-						p.paperType = POSTER;
-					else if(strcmp(s,"Full paper") == 0)
-						p.paperType = FULL_PAPER;
-					else if(strcmp(s,"Short paper") == 0)
-						p.paperType = SHORT_PAPER;
-				}
-				s = strtok (NULL, "|"); p.utc = s ? s :UNDEF;
+				s = strtok (NULL, "|"); p.paperType = s ? s :UNDEF;
+				s = strtok (NULL, "|"); p.decision = s && atoi(s) > 0 ? atoi(s):-1;
+				s = strtok (NULL, "|"); p.utc = s ? s :UNDEF;				
 				s = strtok (NULL, "|"); p.constraintDay1 = s ? s :UNDEF;
 				s = strtok (NULL, "|"); p.constraintDay2 = s ? s :UNDEF;
 				s = strtok (NULL, "|"); p.constraintDay3 = s ? s : UNDEF;	
-				
+						
 				papers.push_back(p);		
 
 			}
@@ -145,7 +143,7 @@ GenomeClass {
 \end
 
 \After everything else function:
-readPapersFile();
+readTracksFile();
 \end
 
 \At the beginning of each generation function:
