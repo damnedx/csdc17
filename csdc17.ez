@@ -32,6 +32,7 @@ class Paper {
 	int sessionId;
 	int primaryAuthorId;
 	int decision;
+	int duration; // minutes
 	
 	string startingTime;
 	string rank;
@@ -63,6 +64,7 @@ class Paper {
 		cout << "Primary Author's Country : " << primaryAuthorCountry << endl;
 		cout << "Authors : " << authors << endl;
 		cout << "Paper's type : " << paperType << endl;
+		cout << "Duration : " << duration << endl;
 		cout << "Decision : " << decision << endl;
 		cout << "Starting time : " << startingTime << endl;
 		cout << "Rank : " << rank << endl;
@@ -71,6 +73,20 @@ class Paper {
 		cout << "Constraint Day 2 : " << constraintDay2 << endl;
 		cout << "Constraint Day 3 : " << constraintDay3 << endl;
 	};
+	
+	void computeDuration()
+	{
+		if(strcmp(paperType.c_str(), "Poster") == 0)
+			duration = 5;
+		else if(strcmp(paperType.c_str(), "Short paper") == 0)
+			duration = 15;
+		else if(strcmp(paperType.c_str(), "Plenary talk") == 0)
+			duration = 60;
+		else if(strcmp(paperType.c_str(), "Advanced Introduction invited talk") == 0)
+			duration = 30;
+
+			
+	}
 	
 };
 
@@ -91,7 +107,7 @@ void readTracksFile(){
 	if (fPaper.is_open()) {
 		Paper p;
 		while ( getline (fPaper,line) ) {
-			line.erase(line.length()-2,line.length()-1);
+			line.erase(line.length()-1,line.length()-1);
 			char * cstr = new char [line.length()+1];
 			strcpy (cstr, line.c_str());
 			char *szKeywords, *szAbstKeywords;
@@ -110,12 +126,15 @@ void readTracksFile(){
 				s = strtok (NULL, "|"); p.primaryAuthorCountry = s ? s :UNDEF;
 				s = strtok (NULL, "|"); p.authors = s ? s :UNDEF;
 				s = strtok (NULL, "|"); p.paperType = s ? s :UNDEF;
-				s = strtok (NULL, "|"); p.decision = s && atoi(s) > 0 ? atoi(s):-1;
+				s = strtok (NULL, "|"); p.decision = s ? atoi(s) : 0;
+				s = strtok (NULL, "|"); p.startingTime = s ? s :UNDEF;
+				s = strtok (NULL, "|"); p.rank = s ? s :UNDEF;
 				s = strtok (NULL, "|"); p.utc = s ? s :UNDEF;				
 				s = strtok (NULL, "|"); p.constraintDay1 = s ? s :UNDEF;
 				s = strtok (NULL, "|"); p.constraintDay2 = s ? s :UNDEF;
 				s = strtok (NULL, "|"); p.constraintDay3 = s ? s : UNDEF;	
 						
+				p.computeDuration();
 				papers.push_back(p);		
 
 			}
@@ -125,6 +144,15 @@ void readTracksFile(){
 	fPaper.close();
 	cout << "[INFOS] (" << papers.size() << ") papers loaded!" << endl;
 } 
+
+void getPapersForTrackId(int id)
+{
+	for (int i=0;i<papers.size();i++){
+		if(papers[i].trackId == id)
+			papers[i].displayPaper();
+	}
+}
+
 \end
 
 \User CUDA:
@@ -135,6 +163,11 @@ void readTracksFile(){
 GenomeClass { 
   // need to declare the genome here
   int i;
+  int trackId;
+  int sessionId;
+  int position;
+  string startingTime;
+  
 }
 \end
 
@@ -144,6 +177,7 @@ GenomeClass {
 
 \After everything else function:
 readTracksFile();
+getPapersForTrackId(5);
 \end
 
 \At the beginning of each generation function:
