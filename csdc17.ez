@@ -13,10 +13,41 @@ _______________________________________________________________*/
 #include <stdio.h>
 #include <string.h>
 #include <algorithm>
-
+#include <time.h>
+#include <string>
+#include <sstream>
+#include <iostream>
+#include <regex>
 #define UNDEF "UNDEFINED"
 #define PATH_TRACKS "tracks.csv"
+#define TRACKS_NUMBER 12
+#define SESSION_NUMBER_MAX 60
 
+template<typename Out>
+void split(const std::string &s, char delim, Out result) {
+    std::stringstream ss;
+    ss.str(s);
+    std::string item;
+    while (std::getline(ss, item, delim)) {
+        *(result++) = item;
+    }
+}
+
+
+std::vector<std::string> split(const std::string &s, char delim) {
+    std::vector<std::string> elems;
+    split(s, delim, std::back_inserter(elems));
+    return elems;
+}
+
+template <typename T> 
+const bool Contains( std::vector<T>& Vec, const T& Element ) 
+{
+    if (std::find(Vec.begin(), Vec.end(), Element) != Vec.end())
+        return true;
+
+    return false;
+}
 using namespace std;
 
 enum PAPER_TYPE_ENUM {
@@ -145,14 +176,93 @@ void readTracksFile(){
 	cout << "[INFOS] (" << papers.size() << ") papers loaded!" << endl;
 } 
 
-void getPapersForTrackId(int id)
+vector<Paper> getPapersForTrackId(int id)
 {
+	vector<Paper> data;
 	for (int i=0;i<papers.size();i++){
 		if(papers[i].trackId == id)
-			papers[i].displayPaper();
+			data.push_back(papers[i]);
 	}
+	return data;
 }
 
+vector<int> getSessionForTrackId(int id)
+{
+	vector<int> data;
+	for (int i=0;i<papers.size();i++){
+		if(papers[i].trackId == id && !Contains(data, papers[i].sessionId))
+			data.push_back(papers[i].sessionId);
+	}
+	return data;
+}
+
+Paper getPaperById(int id)
+{
+	Paper data;
+	for (int i=0;i<papers.size();i++){
+		if(papers[i].paperId == id){
+			data = papers[i];
+			break;
+		}
+	}
+	return data;
+}
+
+time_t getRandomDate(){
+	struct tm info;
+	info.tm_year = 2015 - 1900;
+	info.tm_mon = 8;
+	info.tm_mday = random(1,4);
+	info.tm_hour = random(0,24);
+	info.tm_min = random(0,59);
+	info.tm_sec = 0;
+	info.tm_isdst = -1;
+	time_t time = mktime(&info);
+	
+	return time;
+}
+
+bool checkDateConstraint(time_t start, Paper p){
+	
+	bool result = false;
+	struct tm *aTime = localtime(&start);	
+	int day = aTime->tm_mday;
+	int hr_start = aTime->tm_hour;
+	string constraintArray = "UNDEF";
+	if(day == 1 && p.constraintDay1 != "UNDEF")
+		constraintArray = p.constraintDay1;	
+	else if(day == 2 && p.constraintDay2 != "UNDEF")
+		constraintArray = p.constraintDay2;	
+	else if(day == 3 && p.constraintDay3 != "UNDEF")
+		constraintArray = p.constraintDay3;
+			
+	if(constraintArray != "UNDEF")
+	{
+		constraintArray.erase(remove(constraintArray.begin(), constraintArray.end(), '['), constraintArray.end());
+		constraintArray.erase(remove(constraintArray.begin(), constraintArray.end(), ']'), constraintArray.end());
+		vector<string> hoursRange = split(constraintArray, ',');
+		
+		int val = 0;
+		for(int k = 0; k < hoursRange.size() / 2; k++)
+		{
+			int minHour = stoi(hoursRange[(k+val)%hoursRange.size()]);
+			int maxHour = stoi(hoursRange[(k+val+1)%hoursRange.size()]);
+			if(hr_start > minHour && hr_start < maxHour){
+				result = true;
+				break;
+			}
+			else
+				result = false;
+			val++;
+		}
+		
+	}
+	else
+		result = true;
+		
+	return result;
+			
+}
 \end
 
 \User CUDA:
@@ -160,24 +270,35 @@ void getPapersForTrackId(int id)
 \end
 
 \User classes :
+
+Adn {
+	int paperId;
+	int sessionId;	
+	int position;	
+	double startingTime;
+	double score;
+}
+
+Element {
+	int trackId;
+	int size;
+	Adn adn[SESSION_NUMBER_MAX];
+}
+
 GenomeClass { 
   // need to declare the genome here
   int i;
-  int trackId;
-  int sessionId;
-  int position;
-  string startingTime;
-  
+  Element track[TRACKS_NUMBER];
 }
 \end
 
 \Before everything else function:
 //cout<<"Before everything else function called "<<endl;
+readTracksFile();
 \end
 
 \After everything else function:
-readTracksFile();
-getPapersForTrackId(5);
+			
 \end
 
 \At the beginning of each generation function:
@@ -193,10 +314,46 @@ getPapersForTrackId(5);
 \end
 
 \GenomeClass::display:
+cout << endl ;
+for(int j = 5; j < 6; j++)
+	for(int i = 0; i < Genome.track[j].size; i++)
+	{
+		time_t date = Genome.track[j].adn[i].startingTime;
+		cout << Genome.track[j].trackId << " " << Genome.track[j].adn[i].sessionId << " " << ctime(&date) << " " << Genome.track[j].adn[i].position << endl;
+		Paper p = getPaperById(Genome.track[j].adn[i].paperId);
+		cout << p.constraintDay1 << "|" << p.constraintDay2 << "|" << p.constraintDay3 << endl;
+	}
 \end
 
 \GenomeClass::initialiser : // "initializer" is also accepted
   // the genome to initialise is known as "Genome"
+  	for(int trackId = 5; trackId < 6; trackId++)
+  	{
+		vector<Paper> paperData = getPapersForTrackId(trackId);
+		Element e;
+		e.size = paperData.size();
+		e.trackId = trackId;
+		for(int i = 0; i < paperData.size(); i++){			
+			Paper p = paperData[i];			
+			e.adn[i].paperId = p.paperId;
+			e.adn[i].sessionId = p.sessionId;
+			e.adn[i].startingTime = getRandomDate();	
+			e.adn[i].position = i;
+		}
+		
+		// positions assignment
+		std::sort(e.adn, e.adn + e.size -1, [](Adn a, Adn b)
+		{
+		  return a.startingTime < b.startingTime; 		
+		});
+		for(int i = 0; i < e.size; i++){			
+			e.adn[i].position = i+1;
+		}
+		
+		Genome.track[trackId] = e;
+
+	}
+	
 \end
 
 \GenomeClass::crossover : 
@@ -209,17 +366,34 @@ getPapersForTrackId(5);
 \end
 
 \GenomeClass::evaluator : // Returns the score as a real value
-  // uses Genome to evaluate the quality of the individual
-  return 0.0;
+	// uses Genome to evaluate the quality of the individual
+	double score = 0.0;
+  
+	// evaluation des contraintes
+	for(int j = 5; j < 6; j++)
+		for(int i = 0; i < Genome.track[j].size; i++)
+		{
+			Element e = Genome.track[j];
+			for(int i = 0;i < e.size; i++){
+				Adn adn = e.adn[i];
+				Paper p = getPaperById(adn.paperId);	
+				time_t start = adn.startingTime;
+				bool res = checkDateConstraint(start, p);
+				if(res)
+					score = score + 100;
+			}
+		}
+  return score;
 \end
 
 \User Makefile options: 
+CXXFLAGS= -std=c++11 -fopenmp    -O2 -g -Wall -fmessage-length=0 -I$(csdc17LIB_PATH)include -I$(EZ_PATH)boost
 \end
 
 \Default run parameters :        // Please let the parameters appear in this order
-  Number of generations : 100    // NB_GEN
+  Number of generations : 1    // NB_GEN
   Time limit: 0 			           // In seconds, 0 to deactivate
-  Population size : 1024			   //POP_SIZE
+  Population size : 10			   //POP_SIZE
   Offspring size : 1024 // or a xx%
   Mutation probability : 1       // MUT_PROB
   Crossover probability : 1      // XOVER_PROB
