@@ -195,6 +195,15 @@ vector<int> getSessionForTrackId(int id)
 	}
 	return data;
 }
+vector<Paper> getSessionPaperForTrackId(int id, int sess)
+{
+	vector<Paper> data;
+	for (int i=0;i<papers.size();i++){
+		if(papers[i].trackId == id && papers[i].sessionId == sess)
+			data.push_back(papers[i]);
+	}
+	return data;
+}
 
 Paper getPaperById(int id)
 {
@@ -263,6 +272,7 @@ bool checkDateConstraint(time_t start, Paper p){
 	return result;
 			
 }
+
 \end
 
 \User CUDA:
@@ -298,7 +308,14 @@ readTracksFile();
 \end
 
 \After everything else function:
-			
+for(int j = 5; j < 6; j++)
+	for(int i = 0; i < bBest->track[j].size; i++)
+	{
+		time_t date = bBest->track[j].adn[i].startingTime;
+		cout << bBest->track[j].trackId << " " << bBest->track[j].adn[i].sessionId << " " << ctime(&date) << " "  << endl;
+		Paper p = getPaperById(bBest->track[j].adn[i].paperId);
+		cout << p.constraintDay1 << "|" << p.constraintDay2 << "|" << p.constraintDay3 << endl;
+	}
 \end
 
 \At the beginning of each generation function:
@@ -332,9 +349,9 @@ for(int j = 5; j < 6; j++)
 		vector<Paper> paperData = getPapersForTrackId(trackId);
 		Element e;
 		e.size = paperData.size();
-		e.trackId = trackId;
 		for(int i = 0; i < paperData.size(); i++){			
 			Paper p = paperData[i];			
+			e.trackId = p.trackId;
 			e.adn[i].paperId = p.paperId;
 			e.adn[i].sessionId = p.sessionId;
 			e.adn[i].startingTime = getRandomDate();	
@@ -342,7 +359,7 @@ for(int j = 5; j < 6; j++)
 		}
 		
 		// positions assignment
-		std::sort(e.adn, e.adn + e.size -1, [](Adn a, Adn b)
+		std::sort(e.adn, e.adn + e.size -1, [](Adn& a, Adn& b)
 		{
 		  return a.startingTime < b.startingTime; 		
 		});
@@ -358,6 +375,24 @@ for(int j = 5; j < 6; j++)
 
 \GenomeClass::crossover : 
   // must create "child" out of "parent1" and "parent2"
+  for(int trackId = 5; trackId < 6 ; trackId++){
+	for(int k = 0; k < parent1.track[trackId].size; k++){
+		if(k%2 == 0)
+			child.track[trackId].adn[k] = parent1.track[trackId].adn[k];
+		else
+			child.track[trackId].adn[k] = parent2.track[trackId].adn[k];
+	}
+	// positions assignment
+	std::sort(child.track[trackId].adn, child.track[trackId].adn + child.track[trackId].size -1, [](Adn& a, Adn& b)
+	{
+	  return a.startingTime < b.startingTime; 		
+	});
+	
+	for(int i = 0; i < child.track[trackId].size; i++){			
+		child.track[trackId].adn[i].position = i+1;
+	}
+	
+  }
 \end
 
 \GenomeClass::mutator : // Must return the number of mutations
@@ -369,20 +404,54 @@ for(int j = 5; j < 6; j++)
 	// uses Genome to evaluate the quality of the individual
 	double score = 0.0;
   
-	// evaluation des contraintes
-	for(int j = 5; j < 6; j++)
-		for(int i = 0; i < Genome.track[j].size; i++)
-		{
-			Element e = Genome.track[j];
-			for(int i = 0;i < e.size; i++){
-				Adn adn = e.adn[i];
-				Paper p = getPaperById(adn.paperId);	
-				time_t start = adn.startingTime;
-				bool res = checkDateConstraint(start, p);
-				if(res)
-					score = score + 100;
+	// Evaluation des contraintes pour chaque tracks
+	for(int j = 5; j < 6; j++){
+		Element e = Genome.track[j];
+		for(int i = 0;i < e.size; i++){
+			Adn adn = e.adn[i];
+			Paper p = getPaperById(adn.paperId);	
+			time_t start = adn.startingTime;
+			bool resDayConstraint = checkDateConstraint(start, p);
+			// evaluation des contraintes d'heures
+			// TODO : verif TIME ZONE
+			resDayConstraint ? score+=100 : score-=1000;
+						
+			time_t end = start + (time_t)p.duration*60;
+
+			for(int pId = 0; pId < e.size; pId++){
+				Adn otherAdn = e.adn[pId];
+				Paper otherPaper = getPaperById(otherAdn.paperId);	
+				time_t startOtherPaper = (time_t)otherAdn.startingTime;
+				time_t endOtherPaper = startOtherPaper + (time_t)otherPaper.duration * 60;
+				
+				// personne ne parle en mm temps au sein de la mm session
+				if(otherAdn.paperId != adn.paperId && otherAdn.sessionId == adn.sessionId)
+				{				
+					if((start <= endOtherPaper) && (startOtherPaper <= start)){
+						score -= 10000;
+					}else{
+						score += 100;
+					}
+				}
+				
+				// eviter de parallelliser les sessions d'une meme track
+				if(otherAdn.paperId != adn.paperId && otherAdn.sessionId != adn.sessionId)
+				{					
+					if((start <= endOtherPaper) && (startOtherPaper <= start)){
+						score -= 100;
+					}else{
+						score += 100;
+					}
+				}
 			}
+			
+			
 		}
+						
+	}
+	
+		
+	
   return score;
 \end
 
@@ -391,9 +460,9 @@ CXXFLAGS= -std=c++11 -fopenmp    -O2 -g -Wall -fmessage-length=0 -I$(csdc17LIB_P
 \end
 
 \Default run parameters :        // Please let the parameters appear in this order
-  Number of generations : 1    // NB_GEN
+  Number of generations : 100    // NB_GEN
   Time limit: 0 			           // In seconds, 0 to deactivate
-  Population size : 10			   //POP_SIZE
+  Population size : 1000	   //POP_SIZE
   Offspring size : 1024 // or a xx%
   Mutation probability : 1       // MUT_PROB
   Crossover probability : 1      // XOVER_PROB
