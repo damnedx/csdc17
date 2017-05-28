@@ -67,7 +67,7 @@ class Paper {
 	int decision;
 	int duration; // minutes
 	
-	string startingTime;
+	double startingTime;
 	string rank;
 	string paperType;
 	string paperTitle;
@@ -82,6 +82,7 @@ class Paper {
 	string constraintDay3;
 	
 	string authors;
+	string chairEsession;
 	
 	
 	void displayPaper(){
@@ -160,7 +161,7 @@ void readTracksFile(){
 				s = strtok (NULL, "|"); p.authors = s ? s :UNDEF;
 				s = strtok (NULL, "|"); p.paperType = s ? s :UNDEF;
 				s = strtok (NULL, "|"); p.decision = s ? atoi(s) : 0;
-				s = strtok (NULL, "|"); p.startingTime = s ? s :UNDEF;
+				s = strtok (NULL, "|"); p.startingTime = 0;
 				s = strtok (NULL, "|"); p.rank = s ? s :UNDEF;
 				s = strtok (NULL, "|"); p.utc = s ? s :UNDEF;				
 				s = strtok (NULL, "|"); p.constraintDay1 = s ? s :UNDEF;
@@ -170,8 +171,26 @@ void readTracksFile(){
 				if(p.paperId == 294){
 					p.constraintDay1 = "[11,21]";
 					p.constraintDay2 = "[11,21]";
+					p.startingTime = 1441105200;
 				}
-						
+				if(p.paperId == 295){
+					p.constraintDay1 = "[14,18]";
+					p.constraintDay2 = "[14,18]";
+					p.startingTime = 1441108800;
+				}
+				if(p.paperId == 292){
+					p.constraintDay1 = "[15,16]";
+					p.startingTime = 1441108800;
+				}
+				if(p.paperId == 291){
+					p.constraintDay2 = "[7,16]";
+					p.startingTime = 1441198800;
+				}
+				if(p.paperId == 513){
+					p.startingTime = 1443704400;
+				}
+
+				
 				p.computeDuration();
 				papers.push_back(p);		
 
@@ -255,7 +274,7 @@ time_t getRandomDate(){
 	info.tm_mon = 8;
 	info.tm_mday = random(1,4);
 	info.tm_hour = random(0,24);
-	info.tm_min = 0;
+	info.tm_min = random(0,59);
 	info.tm_sec = 0;
 	info.tm_isdst = -1;
 	time_t time = mktime(&info);
@@ -316,15 +335,13 @@ int checkDateConstraint(time_t start, Paper p){
 				break;
 			}
 			else{
-				score += (abs(hr_start - minHour)*10);
+				score = abs(hr_start - minHour)*100;
 			}
 			val++;
 							
 		}
 		
 	}
-	else
-		score = 0;
 		
 	return score*100;
 			
@@ -412,7 +429,10 @@ for(int j = 0; j < TRACKS_NUMBER; j++)
 			Genome.track[trackId].trackId = p.trackId;
 			Genome.track[trackId].adn[i].paperId = p.paperId;
 			Genome.track[trackId].adn[i].sessionId = p.sessionId;
-			Genome.track[trackId].adn[i].startingTime = getRandomDate();
+			if(trackId == 15)
+				Genome.track[trackId].adn[i].startingTime = p.startingTime;
+			else
+				Genome.track[trackId].adn[i].startingTime = getRandomDate();
 			
 							
 			Genome.track[trackId].adn[i].position = i;
@@ -483,7 +503,7 @@ for(int j = 0; j < TRACKS_NUMBER; j++)
 				if(otherAdn.paperId != adn.paperId && otherAdn.trackId == adn.trackId && otherAdn.sessionId != adn.sessionId)
 				{					
 					if((start <= endOtherPaper) && (startOtherPaper <= start)){ //overgap
-						score -= 5000;
+						score -= abs(end - startOtherPaper);
 					}
 				}
 				
@@ -493,7 +513,18 @@ for(int j = 0; j < TRACKS_NUMBER; j++)
 					int diff = abs(end - startOtherPaper);
 					score -= diff;
 					
-				}				
+				}			
+			}
+			// verification si overgap avec les sessions commune de la track 15
+			Element commonTrack = Genome.track[15];
+			for(int common = 0; common < commonTrack.size; common++){
+				
+				time_t startcommonDate = commonTrack.adn[common].startingTime;
+				Paper commonPaper = getPaperById(commonTrack.adn[common].paperId);	
+				time_t endcommonDate = startcommonDate + (time_t)commonPaper.duration * 60;
+				if((start <= endcommonDate) && (startcommonDate <= start)){ //overgap
+						score -= 10000;
+				}
 			}
 
 			
@@ -501,7 +532,7 @@ for(int j = 0; j < TRACKS_NUMBER; j++)
 						
 	}
 	
-  return score;
+  return -score;
 \end
 
 \User Makefile options: 
@@ -509,17 +540,17 @@ CXXFLAGS= -std=c++11 -fopenmp    -O2 -g -Wall -fmessage-length=0 -I$(csdc17LIB_P
 \end
 
 \Default run parameters :        // Please let the parameters appear in this order
-  Number of generations : 200   	// NB_GEN
+  Number of generations : 300   	// NB_GEN
   Time limit: 0 			// In seconds, 0 to deactivate
-  Population size : 64			//POP_SIZE
-  Offspring size : 64 // 40% 
+  Population size : 128			//POP_SIZE
+  Offspring size : 128 // 40% 
   Mutation probability : 1       // MUT_PROB
   Crossover probability : 1      // XOVER_PROB
-  Evaluator goal : maximise      // Maximise
-  Selection operator: Tournament 4
+  Evaluator goal : minimise      // Maximise
+  Selection operator: Tournament 0.6
   Surviving parents: 100  //percentage or absolute  
   Surviving offspring: 100%
-  Reduce parents operator: Tournament 2
+  Reduce parents operator: Tournament 4
   Reduce offspring operator: Tournament 2
   Final reduce operator: Tournament 2
 
