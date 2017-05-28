@@ -20,7 +20,7 @@ _______________________________________________________________*/
 #include <regex>
 #define UNDEF "UNDEFINED"
 #define PATH_TRACKS "tracks.csv"
-#define TRACKS_NUMBER 12
+#define TRACKS_NUMBER 17
 #define SESSION_NUMBER_MAX 60
 
 template<typename Out>
@@ -49,6 +49,8 @@ const bool Contains( std::vector<T>& Vec, const T& Element )
     return false;
 }
 using namespace std;
+
+float pMutPerGene=0.1;
 
 enum PAPER_TYPE_ENUM {
 	FULL_PAPER,
@@ -164,6 +166,11 @@ void readTracksFile(){
 				s = strtok (NULL, "|"); p.constraintDay1 = s ? s :UNDEF;
 				s = strtok (NULL, "|"); p.constraintDay2 = s ? s :UNDEF;
 				s = strtok (NULL, "|"); p.constraintDay3 = s ? s : UNDEF;	
+				
+				if(p.paperId == 294){
+					p.constraintDay1 = "[11,21]";
+					p.constraintDay2 = "[11,21]";
+				}
 						
 				p.computeDuration();
 				papers.push_back(p);		
@@ -216,14 +223,39 @@ Paper getPaperById(int id)
 	}
 	return data;
 }
-
+bool utcRemove(char c)
+{	
+    switch(c)
+    {
+		case ' ':
+		case 'h':
+		case 'o':
+		case 'u':
+		case 'r':
+		case 's':
+		case 'U':
+		case 'T':
+		case 'C':
+		case 'G':
+		case 'M':
+		case 'n':
+		case 'a':
+			return true;
+		default:
+			return false;
+    }
+}
+bool is_number(const std::string& s)
+{
+    return( strspn( s.c_str(), "+-0123456789" ) == s.size() );
+}
 time_t getRandomDate(){
 	struct tm info;
 	info.tm_year = 2015 - 1900;
 	info.tm_mon = 8;
 	info.tm_mday = random(1,4);
 	info.tm_hour = random(0,24);
-	info.tm_min = random(0,59);
+	info.tm_min = 0;
 	info.tm_sec = 0;
 	info.tm_isdst = -1;
 	time_t time = mktime(&info);
@@ -231,12 +263,10 @@ time_t getRandomDate(){
 	return time;
 }
 
-bool checkDateConstraint(time_t start, Paper p){
-	
-	bool result = false;
-	struct tm *aTime = localtime(&start);	
+int checkDateConstraint(time_t start, Paper p){
+	int score = 0;
+	struct tm *aTime = localtime(&start);
 	int day = aTime->tm_mday;
-	int hr_start = aTime->tm_hour;
 	string constraintArray = "UNDEF";
 	if(day == 1 && p.constraintDay1 != "UNDEF")
 		constraintArray = p.constraintDay1;	
@@ -244,7 +274,18 @@ bool checkDateConstraint(time_t start, Paper p){
 		constraintArray = p.constraintDay2;	
 	else if(day == 3 && p.constraintDay3 != "UNDEF")
 		constraintArray = p.constraintDay3;
+		
+	string utcArray = p.utc;
+	
+	if(utcArray != "UNDEF")
+	{
+		utcArray.erase(std::remove_if(utcArray.begin(), utcArray.end(), &utcRemove), utcArray.end());
+
+		if(is_number(utcArray))
+			p.utc = utcArray;
 			
+		
+	}	
 	if(constraintArray != "UNDEF")
 	{
 		constraintArray.erase(remove(constraintArray.begin(), constraintArray.end(), '['), constraintArray.end());
@@ -252,24 +293,40 @@ bool checkDateConstraint(time_t start, Paper p){
 		vector<string> hoursRange = split(constraintArray, ',');
 		
 		int val = 0;
+		int utc = 0;
+		if(is_number(p.utc)) {
+			if(stoi(p.utc) < 15){
+				utc = stoi(p.utc);
+			}
+		}
+		int hr_start = (aTime->tm_hour)%24;
+		
+		
+		start = (time_t)((utc*3600)) + start;
+		aTime = localtime(&start);
+		hr_start = (aTime->tm_hour)%24;
+			
 		for(int k = 0; k < hoursRange.size() / 2; k++)
 		{
-			int minHour = stoi(hoursRange[(k+val)%hoursRange.size()]);
-			int maxHour = stoi(hoursRange[(k+val+1)%hoursRange.size()]);
-			if(hr_start > minHour && hr_start < maxHour){
-				result = true;
+			int minHour = (stoi(hoursRange[(k+val)%hoursRange.size()]))%24;
+			int maxHour = (stoi(hoursRange[(k+val+1)%hoursRange.size()]))%24;
+		
+			if(hr_start >= minHour && hr_start <= maxHour){
+				score = abs(hr_start - minHour);
 				break;
 			}
-			else
-				result = false;
+			else{
+				score += (abs(hr_start - minHour)*10);
+			}
 			val++;
+							
 		}
 		
 	}
 	else
-		result = true;
+		score = 0;
 		
-	return result;
+	return score*100;
 			
 }
 
@@ -284,7 +341,8 @@ bool checkDateConstraint(time_t start, Paper p){
 Adn {
 	int paperId;
 	int sessionId;	
-	int position;	
+	int position;
+	int trackId;	
 	double startingTime;
 	double score;
 }
@@ -312,8 +370,9 @@ for(int j = 5; j < 6; j++)
 	for(int i = 0; i < bBest->track[j].size; i++)
 	{
 		time_t date = bBest->track[j].adn[i].startingTime;
-		cout << bBest->track[j].trackId << " " << bBest->track[j].adn[i].sessionId << " " << ctime(&date) << " "  << endl;
 		Paper p = getPaperById(bBest->track[j].adn[i].paperId);
+		cout << "Le papier : " << p.paperId << " doit passe a : " << ctime(&date) << endl;
+		
 		cout << p.constraintDay1 << "|" << p.constraintDay2 << "|" << p.constraintDay3 << endl;
 	}
 \end
@@ -332,7 +391,7 @@ for(int j = 5; j < 6; j++)
 
 \GenomeClass::display:
 cout << endl ;
-for(int j = 5; j < 6; j++)
+for(int j = 0; j < TRACKS_NUMBER; j++)
 	for(int i = 0; i < Genome.track[j].size; i++)
 	{
 		time_t date = Genome.track[j].adn[i].startingTime;
@@ -344,30 +403,22 @@ for(int j = 5; j < 6; j++)
 
 \GenomeClass::initialiser : // "initializer" is also accepted
   // the genome to initialise is known as "Genome"
-  	for(int trackId = 5; trackId < 6; trackId++)
+  	for(int trackId = 0; trackId < TRACKS_NUMBER; trackId++)
   	{
-		vector<Paper> paperData = getPapersForTrackId(trackId);
-		Element e;
-		e.size = paperData.size();
+		vector<Paper> paperData = getPapersForTrackId(trackId);		
+		Genome.track[trackId].size = paperData.size();
 		for(int i = 0; i < paperData.size(); i++){			
 			Paper p = paperData[i];			
-			e.trackId = p.trackId;
-			e.adn[i].paperId = p.paperId;
-			e.adn[i].sessionId = p.sessionId;
-			e.adn[i].startingTime = getRandomDate();	
-			e.adn[i].position = i;
+			Genome.track[trackId].trackId = p.trackId;
+			Genome.track[trackId].adn[i].paperId = p.paperId;
+			Genome.track[trackId].adn[i].sessionId = p.sessionId;
+			Genome.track[trackId].adn[i].startingTime = getRandomDate();
+			
+							
+			Genome.track[trackId].adn[i].position = i;
+			Genome.track[trackId].adn[i].trackId = trackId;
 		}
-		
-		// positions assignment
-		std::sort(e.adn, e.adn + e.size -1, [](Adn& a, Adn& b)
-		{
-		  return a.startingTime < b.startingTime; 		
-		});
-		for(int i = 0; i < e.size; i++){			
-			e.adn[i].position = i+1;
-		}
-		
-		Genome.track[trackId] = e;
+
 
 	}
 	
@@ -375,46 +426,42 @@ for(int j = 5; j < 6; j++)
 
 \GenomeClass::crossover : 
   // must create "child" out of "parent1" and "parent2"
-  for(int trackId = 5; trackId < 6 ; trackId++){
-	for(int k = 0; k < parent1.track[trackId].size; k++){
-		if(k%2 == 0)
-			child.track[trackId].adn[k] = parent1.track[trackId].adn[k];
-		else
-			child.track[trackId].adn[k] = parent2.track[trackId].adn[k];
-	}
-	// positions assignment
-	std::sort(child.track[trackId].adn, child.track[trackId].adn + child.track[trackId].size -1, [](Adn& a, Adn& b)
-	{
-	  return a.startingTime < b.startingTime; 		
-	});
-	
-	for(int i = 0; i < child.track[trackId].size; i++){			
-		child.track[trackId].adn[i].position = i+1;
-	}
-	
+  for(int trackId = 0; trackId < TRACKS_NUMBER; trackId++){
+	 
+	int nLocus = parent1.track[trackId].size / 2 ;
+	for(int k = nLocus; k < parent2.track[trackId].size; k++){
+		child.track[trackId].adn[k] = parent2.track[trackId].adn[k];		
+	}	
+	  
   }
+    
 \end
 
 \GenomeClass::mutator : // Must return the number of mutations
   // must mutate "Genome"
-  return 0;
+  int npermute = 0;
+  for(int j = 0; j < TRACKS_NUMBER; j++){
+		for(int i = 0;i < Genome.track[j].size; i++){
+			if(tossCoin(pMutPerGene))
+				Genome.track[j].adn[i].startingTime = getRandomDate();			
+		}
+  }
+  return npermute;
 \end
 
 \GenomeClass::evaluator : // Returns the score as a real value
 	// uses Genome to evaluate the quality of the individual
 	double score = 0.0;
-  
-	// Evaluation des contraintes pour chaque tracks
-	for(int j = 5; j < 6; j++){
+  	// Evaluation des contraintes pour chaque tracks
+	for(int j = 0; j < TRACKS_NUMBER; j++){
 		Element e = Genome.track[j];
 		for(int i = 0;i < e.size; i++){
 			Adn adn = e.adn[i];
 			Paper p = getPaperById(adn.paperId);	
 			time_t start = adn.startingTime;
-			bool resDayConstraint = checkDateConstraint(start, p);
 			// evaluation des contraintes d'heures
-			// TODO : verif TIME ZONE
-			resDayConstraint ? score+=100 : score-=1000;
+			int scoreConstraint = checkDateConstraint(start, p);
+			score -= scoreConstraint;
 						
 			time_t end = start + (time_t)p.duration*60;
 
@@ -425,32 +472,34 @@ for(int j = 5; j < 6; j++)
 				time_t endOtherPaper = startOtherPaper + (time_t)otherPaper.duration * 60;
 				
 				// personne ne parle en mm temps au sein de la mm session
-				if(otherAdn.paperId != adn.paperId && otherAdn.sessionId == adn.sessionId)
+				if(otherAdn.trackId == adn.trackId && otherAdn.paperId != adn.paperId && otherAdn.sessionId == adn.sessionId)
 				{				
-					if((start <= endOtherPaper) && (startOtherPaper <= start)){
+					if((start <= endOtherPaper) && (startOtherPaper <= start)){ //overgap
 						score -= 10000;
-					}else{
-						score += 100;
 					}
 				}
 				
 				// eviter de parallelliser les sessions d'une meme track
-				if(otherAdn.paperId != adn.paperId && otherAdn.sessionId != adn.sessionId)
+				if(otherAdn.paperId != adn.paperId && otherAdn.trackId == adn.trackId && otherAdn.sessionId != adn.sessionId)
 				{					
-					if((start <= endOtherPaper) && (startOtherPaper <= start)){
-						score -= 100;
-					}else{
-						score += 100;
+					if((start <= endOtherPaper) && (startOtherPaper <= start)){ //overgap
+						score -= 5000;
 					}
 				}
+				
+				// minimiser le nombre de jour par e-session
+				if(otherAdn.paperId != adn.paperId && otherAdn.trackId == adn.trackId)
+				{
+					int diff = abs(end - startOtherPaper);
+					score -= diff;
+					
+				}				
 			}
-			
+
 			
 		}
 						
 	}
-	
-		
 	
   return score;
 \end
@@ -460,32 +509,32 @@ CXXFLAGS= -std=c++11 -fopenmp    -O2 -g -Wall -fmessage-length=0 -I$(csdc17LIB_P
 \end
 
 \Default run parameters :        // Please let the parameters appear in this order
-  Number of generations : 100    // NB_GEN
-  Time limit: 0 			           // In seconds, 0 to deactivate
-  Population size : 1000	   //POP_SIZE
-  Offspring size : 1024 // or a xx%
+  Number of generations : 200   	// NB_GEN
+  Time limit: 0 			// In seconds, 0 to deactivate
+  Population size : 64			//POP_SIZE
+  Offspring size : 64 // 40% 
   Mutation probability : 1       // MUT_PROB
   Crossover probability : 1      // XOVER_PROB
-  Evaluator goal : maximize      // maximise
-  Selection operator: Tournament 2.0
-  Surviving parents: 100%        // Percentage or absolute  
-  Surviving offspring: 100%      // Percentage or absolute  
+  Evaluator goal : maximise      // Maximise
+  Selection operator: Tournament 4
+  Surviving parents: 100  //percentage or absolute  
+  Surviving offspring: 100%
   Reduce parents operator: Tournament 2
   Reduce offspring operator: Tournament 2
   Final reduce operator: Tournament 2
 
-  Elitism: Strong			           // Weak or Strong
+  Elitism: Weak			//Weak or Strong
   Elite: 1
-  Print stats: true				       // Default: 1
+  Print stats: true				//Default: 1
   Generate csv stats file:false			
   Generate gnuplot script:false
   Generate R script:false
-  Plot stats:true				         // Default: 0
+  Plot stats:true				//Default: 0
 
   Remote island model: false
-  IP file: ip.txt 			         // List of IP:PORT of islands to send individuals to
-  Migration probability: 0.33    // Probability of sending an individual per generation
+  IP file: ip.txt 			//File containing all the remote island's IP
   Server port : 2929
+  Migration probability: 0.3
 
   Save population: false
   Start from file:false
